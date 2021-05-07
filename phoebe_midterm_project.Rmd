@@ -1,0 +1,314 @@
+---
+title: "P8106 Midterm Project"
+author: "Phoebe Mo(km3624)"
+date: "Mar 26, 2021"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE, echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(caret)
+library(AppliedPredictiveModeling)
+library(patchwork)
+library(corrplot)
+library(mgcv)
+library(dplyr)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = 0.6,
+  out.width = "90%"
+)
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+pokemon = read_csv("/Users/phoebee/Desktop/DS2/p8106_midterm_project/pokemon_alopez247.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    type_2 = replace_na(type_2, "none"),
+    egg_group_2 = replace_na(egg_group_2, "none"),
+    generation = as.factor(generation),
+  ) %>%
+  dplyr::select(-number, -name, -total, -has_gender) %>%
+  na.omit()
+
+pokemon_x = pokemon %>% dplyr::select(-catch_rate)
+pokemon_y = pokemon$catch_rate
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# normal, fuery type seems to have a higher catch rate
+type_1_plot = ggplot(aes(x = type_1, y = catch_rate), data = pokemon %>% mutate(type_1 = fct_reorder(type_1, catch_rate))) +
+  geom_boxplot()
+
+type_2_plot = ggplot(aes(x = type_2, y = catch_rate), data = pokemon %>% mutate(type_2 = fct_reorder(type_2, catch_rate))) +
+  geom_boxplot()
+
+type_plot = type_1_plot / type_2_plot
+
+# battle attribute plot
+hp_plot = ggplot(aes(x = hp, y = catch_rate), data = pokemon) +
+  geom_point(alpha = 0.5)
+
+attack_plot = ggplot(aes(x = attack, y = catch_rate), data = pokemon) +
+  geom_point(alpha = 0.5)
+
+defense_plot = ggplot(aes(x = defense, y = catch_rate), data = pokemon) +
+  geom_point(alpha = 0.5)
+
+sp_attack_plot = ggplot(aes(x = sp_atk, y = catch_rate), data = pokemon) +
+  geom_point(alpha = 0.5)
+
+sp_defense_plot = ggplot(aes(x = sp_def, y = catch_rate), data = pokemon) +
+  geom_point(alpha = 0.5)
+
+speed_plot = ggplot(aes(x = speed, y = catch_rate), data = pokemon) +
+  geom_point(alpha = 0.5)
+
+battle_attribute_plot = (hp_plot + attack_plot + defense_plot) / (sp_attack_plot + sp_defense_plot + speed_plot)
+
+# other attributes plot
+generation_plot = ggplot(aes(x = generation, y = catch_rate), data = pokemon) +
+  geom_boxplot()
+
+legendary_plot = ggplot(aes(x = is_legendary, y = catch_rate), data = pokemon) +
+  geom_boxplot()
+
+color_plot = ggplot(aes(x = color, y = catch_rate), data = pokemon) +
+  geom_boxplot()
+
+pr_male_plot = ggplot(aes(x = pr_male, y = catch_rate, group = pr_male), data = pokemon) + geom_boxplot()
+
+egg_group1_plot = ggplot(aes(x = egg_group_1, y = catch_rate), data = pokemon %>% mutate(egg_group_1 = fct_reorder(egg_group_1, catch_rate))) +
+  geom_boxplot()
+
+egg_group2_plot = ggplot(aes(x = egg_group_2, y = catch_rate), data = pokemon %>% mutate(egg_group_2 = fct_reorder(egg_group_2, catch_rate))) +
+  geom_boxplot()
+
+has_mega_plot = ggplot(aes(x = has_mega_evolution, y = catch_rate), data = pokemon) +
+  geom_boxplot()
+
+height_plot = ggplot(aes(x = height_m, y = catch_rate), data = pokemon) +
+  geom_point()
+
+weight_plot = ggplot(aes(x = weight_kg, y = catch_rate), data = pokemon) +
+  geom_point()
+
+body_style_plot = ggplot(aes(x = body_style, y = catch_rate), data = pokemon %>% mutate(body_style = fct_reorder(body_style, catch_rate))) + geom_boxplot() + theme(axis.text.x = element_text(angle = 90, vjust = 0.2, hjust = 1))
+
+# combine to see trends
+other_attribute_plot_1 = (generation_plot + legendary_plot + pr_male_plot) / (has_mega_plot + height_plot + weight_plot)
+
+other_attribute_plot_2 = body_style_plot / egg_group1_plot / egg_group2_plot
+```
+
+
+# 1. INTRODUCTION
+
+## 1.1 Motivation and Objective
+
+In this project, I use a dataset that contains different attributes and catch rates for various pokemons to try to understand the relationship between these attributes and catch rates. Here are some questions I want to anwser: Which predictor(s) play important roles in predicting catch rates? Which type of model (linear or non-linear) serves as a better method to predict the catch rate?
+
+## 1.2 Data Preparation and Cleaning
+
+The original dataset has 20 predictors such as HP, and the outcome 'catch_rate'. After cleaning the names of these variables, I did the following steps to clean the data:
+
+1.2.1 Notice that 'type_2' and 'egg_group_2' are indicators of if a pokemon has a second type or belongs to a second egg group. The 'Null' values in the data means the pokemon does not has the second type/group, so I changed them into "none" to make them as a category to be meaningful;
+
+1.2.2 The 'generation' predictor is originally a numeric type, but it has only 6 integer values, so I decided to mutate it to be categorical;
+
+1.2.3. Irrelavant variables 'number' and 'name' are dropped. 'total', which is the total base battle statistic for each pokemon, is calculated and reflected in other battle attributes such as 'hp' and 'attack'. So I dropped it to avoid intercollinearity. Later, after plotting the correlation map, I found 'weight_kg' and 'height_m' has relatively high correlation(correlation plot is shown in section 2). After consideration,  I chose to drop 'height_m' since it may has less effect on catch rate compared to 'weight_kg'. 'has_gender' is also dropped because all values are "TRUE".
+
+# 2. Exploratory Analysis / Visualization
+
+After plotting scatter plots for continuous predictors and boxplots for categorical predictors, significant trends were not observed in different types, egg groups, body_styles or colors. However, the battle attributes: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', and 'speed' seem to have a negative association with catch rate. The 'weight_kg' also seens to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+battle_attribute_plot
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+other_attribute_plot_1
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# checking correlation between continuous predictors
+cor(pokemon %>% dplyr::select(-c(type_1, type_2, generation, is_legendary, color, egg_group_1, egg_group_2, body_style))) %>%
+  corrplot(method = "circle", type = "upper", diag = F)
+
+# height_m and weight_kg have high correlation = 0.63. So going to drop one of them, here I choose to drop height_m.
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# since we have enough number of observations. Separate into training and test data
+set.seed(1)
+pokemon = pokemon %>% dplyr::select(-height_m)
+trainRows = createDataPartition(pokemon$catch_rate, p = 0.75, list = F)
+train_x = model.matrix(catch_rate ~., pokemon)[trainRows, -1]
+train_y = pokemon$catch_rate[trainRows]
+test_x = model.matrix(catch_rate ~., pokemon)[-trainRows, -1]
+test_y = pokemon$catch_rate[-trainRows]
+
+# control for cross-validation
+ctrl1 = trainControl(method = "repeatedcv", number = 10, repeats = 5)
+
+# linear regression
+set.seed(1)
+lm_fit = train(train_x, train_y,
+               method = "lm",
+               trControl = ctrl1)
+
+lm_summary = summary(lm_fit)
+
+# retrieve significant coefficients
+sig_coef = as.data.frame(summary(lm_fit)$coef)[-c(2,3)]
+names(sig_coef)[1] = "lm_estimate"
+names(sig_coef)[2] = "lm_pvalue"
+sig_coef = sig_coef %>% filter(lm_pvalue < 0.05)
+
+# ridge regression
+set.seed(1)
+ridge_fit = train(train_x, train_y,
+                  method = "glmnet",
+                  tuneGrid = expand.grid(alpha = 0, lambda = exp(seq(10, -2, length = 100))),
+                  preProc = c("center", "scale"),
+                  trControl = ctrl1)
+
+ridge_lambda = ridge_fit$bestTune$lambda
+ridge_lambda_plot = plot(ridge_fit, xTrans = log)
+ridge_coef = coef(ridge_fit$finalModel, s = ridge_fit$bestTune$lambda)
+
+ridge_coef_df = data.frame(ridge_coef = c(107.0639, 5.4805, 1.9921, -14.4888, -11.85129, -9.72789, -12.2135, -9.6984, -14.1489, 4.3907, -7.41765, 5.396016))
+sig_coef = sig_coef %>% cbind(ridge_coef_df)
+
+# lasso regression
+set.seed(1)
+lasso_fit = train(train_x, train_y,
+                  method = "glmnet",
+                  tuneGrid = expand.grid(alpha = 1, lambda = exp(seq(5, -1, length = 100))),
+                  preProc = c("center", "scale"),
+                  trControl = ctrl1)
+
+lasso_lambda = lasso_fit$bestTune$lambda
+lasso_lambda_plot = plot(lasso_fit, xTrans = log)
+lasso_coef = coef(lasso_fit$finalModel, s = lasso_fit$bestTune$lambda)
+
+lasso_coef_df = data.frame(lasso_coef = c(107.0639, 4.3126, 0, -16.15686, -12.3474, -12.047083, -12.970641, -9.346032, -16.24834, 1.32461, -8.56294, 2.91178 ))
+sig_coef = sig_coef %>% cbind(lasso_coef_df)
+
+# Elastic Net
+set.seed(1)
+enet_fit = train(train_x, train_y,
+                 method = "glmnet",
+                 tuneGrid = expand.grid(alpha = seq(0, 1, length = 11),
+                                        lambda = exp(seq(3, -3, length = 50))),
+                 preProc = c("center", "scale"),
+                 trControl = ctrl1)
+enet_lambda = enet_fit$bestTune$lambda
+enet_alpha = enet_fit$bestTune$alpha
+enet_coef = coef(enet_fit$finalModel, enet_fit$bestTune$lambda)
+
+enet_coef_df = data.frame(enet_coef = c(107.0639, 4.48354, 0, -16.2683, -12.34154, -11.98643, -12.910558, -9.31997, -16.4561, 1.44469, -8.6152, 3.124))
+sig_coef = sig_coef %>% cbind(enet_coef_df)
+
+# GAM
+set.seed(1)
+gam_fit = gam(catch_rate ~ type_1 + type_2 + s(hp) + s(attack) + s(defense) + s(sp_atk) + s(sp_def) + s(speed) + generation + is_legendary + color + pr_male + egg_group_1 + egg_group_2 + has_mega_evolution + s(weight_kg) + body_style, data = pokemon[trainRows, ])
+
+#gam_plot = plot(gam_fit, scale = 0)
+rmse_gam = mean((pokemon$catch_rate[-trainRows] - predict(gam_fit, newdata = pokemon[-trainRows, ])) ^ 2)
+
+# training performance (metric = RMSE, prefer lower mean RMSE)
+# GAM has lowest train RMSE = 41.50975
+resamp = resamples(list(lm = lm_fit, ridge = ridge_fit, lasso = lasso_fit, enet = enet_fit))
+resamp_summary = summary(resamp)
+
+gam_train_rmse = sqrt(mean((pokemon$catch_rate[trainRows] - predict(gam_fit, newdata = pokemon[trainRows, ])) ^ 2))
+
+# show significance and coefficients, check it to summarize it
+gam_summary = summary(gam_fit)
+
+
+# test performance (metric = RMSE)
+# lasso has lowest test RMSE = 47.77188
+lm_test_rmse = sqrt(mean((test_y - predict(lm_fit, newdata = test_x)) ^ 2))
+
+ridge_test_rmse = sqrt(mean((test_y - predict(ridge_fit, newdata = test_x)) ^ 2))
+
+lasso_test_rmse = sqrt(mean((test_y - predict(lasso_fit, newdata = test_x)) ^ 2))
+
+enet_test_rmse = sqrt(mean((test_y - predict(enet_fit, newdata = test_x)) ^ 2))
+
+gam_test_rmse = sqrt(mean((pokemon$catch_rate[-trainRows] - predict(gam_fit, newdata = pokemon[-trainRows, ])) ^ 2))
+
+
+# combine all train & test RMSE for all models
+all_rmse = data.frame(lm = c(54.543, 49.260),
+                      ridge = c(51.500, 48.011),
+                      lasso = c(50.419, 47.772),
+                      enet = c(50.422, 47.783),
+                      GAM = c(41.510, 48.414))
+row.names(all_rmse) = c("train RMSE", "test RMSE")
+```
+
+# 3. Models
+
+After the data cleaning procedure, there will be totally 17 predictors included in the models. Since the final dataset contains about 644 observations, I decided to separate it into 75% training data and 25% test data. Repeated 10-fold cross-validation is selected to do model training and select the best tuning parameter (which has the lowest RMSE given by repeated cv) for the following models in caret function.
+
+## 3.1 Multiple Linear Regression
+
+First, I fit a multiple linear regression to see if any interesting significant associations can be observed. Using this model, we assume the outcome is following normal distribution, which is not perfect for our data. However, since our main objective is to do predictions, we can ignore this temporarily. It turns out that the fitted model has Adjusted R-squared = 0.5767 which is not too bad. The model shows that 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', 'speed', 'pr_male' play important roles in predicting catch rate. Especially, 'hp', 'defense', 'sp_atk', 'pr_male' and 'speed' have very small p-value.
+
+## 3.2 Lasso, Ridge, and Elastic Net
+
+Then, I use shrinkage methods including lasso, ridge, and elastic net to make penalization to shrink the coefficients as lambda becomes larger. They mainly focus on fitting a linear model and reducing the RSS. Although ridge regression shrinks the coefficients, it will still remain all the predictors in the result. Conversely, lasso regression can help us do the variable selection. In fact, although the dummy variable 'type_2Water' is labeled as significant in the MLR, it is eliminated by the lasso model. Elastic Net regression combines the penalties from both lasso and ridge methods. In all these three models, data is scaled and centered to ensure fairness of shrinking.
+
+The tuning parameters lambda is chosen by the caret function after we specify a range. The one that has the minimum RMSE is selected.
+
+Overall, the shrinkage methods give us similar direction of association between the predictors and catch rate. And they seem to have a larger coefficients for the battle attributes(e.g. hp) and smaller coefficients for the remaining predictors.
+
+
+## 3.3 GAM model
+
+Based on the visualization plots, we can see that some continuous variables have curve-like trend in the right tail. In this case, I consider using GAM model in order to include this trend into the analysis. For such predictors, I allow GAM to make it non-parametric smoothing term. GCV is used to choose the degree of freedom for the model. 
+
+After fitting, it is observed that the smooth terms of 'hp', 'attack', 'defense', 'sp_atk', 'speed', and the coefficients of 'type_1Poison', 'type_2Water', 'generation3', 'pr_male', 'egg_group_1Undiscovered', 'body_stylemultiple_bodies', are significant. These result greatly coincides with the ones given by previous model.
+
+## 3.4 Model Comparisons
+
+As can see from the following first table, the predictors that are significant in the MLR model are also found to have a relatively large associations in all other models. Results given by GAM are not included, but GAM shows similar pattern, except that it also include some other significant dummy variables.
+
+From the second RMSE table, I select the mean RMSE as a standard to select the model. GAM has the smallest training RMSE = 41.510, which means it did the best fitting to the training data. This is reasonable since we have observed some nonlinear trends in some of the continuous variables, so fitting GAM may be a good choice. Therefore, GAM will be chosen to predict the data. For the test RMSE, lasso has the best performance of 47.772 while GAM is a little bit behind. For both train RMSE and test RMSE, the MLR model has the worst performances.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+sig_coef %>% knitr::kable(digits = 3, caption = "Coefficients of Predictors for each Model")
+all_rmse %>% knitr::kable(caption = "Train and Test RMSE for each Model")
+```
+
+# 4. Conclusions
+
+For the model selection, since GAM has the smallest training RMSE, GAM has been selected to do future catch rate prediction.
+
+The most important predictors given by MLR and shrinkage methods model are: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', 'speed', 'pr_male', and they all have a negative association with catch_rate. There are also several significant dummy variables from some categorical predictors, but since they may be just one type of, for example, body style or pokemon type, the whole categorical predictor itself may not be seemed as important predictor for catch rate.
+
+This result is greatly coincide with my expectation. Before doing the training, I expect the battle attributes may be important predictors for catch rate, because it is reasonable that the pokemon which has better battle attributes should be harder to catch. From the result, it can be seen that this expectation is confirmed. However, I did not expect the percent of male('pr_male') will also be a significant predictor of catch rate, which is surprising.
+
+# 5. Limitations
+
+5.1 Although lasso, ridge, and elastic net method still provide us a prospective of how each important predictor associates with catch rate, it is relatively hard to interpret the coefficients given by them.
+
+5.2 Since our number of observations is not small compared to the number of predictors and the correlation between each pair of predictors is not that large, the use of shrinkage methods may not be a very good fit;
+
+5.3 The GAM model does not truly select the tuning parameter and do the model training, therefore this may be the limitation in the GAM model. However, since it has the smallest training RMSE, it is still chosen as our best method to do the prediction in this project.
+

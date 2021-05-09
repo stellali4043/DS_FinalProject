@@ -1,30 +1,93 @@
 ---
-title: "Final_Project"
-author: "Stella Li"
+title: "P8106 Final Project"
+author: "Phoebe Mo(km3624), Stella Li(), Yihan Feng()"
 date: "5/7/2021"
-output: pdf_document
+output:
+  pdf_document:
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(RColorBrewer)
+library(factoextra)
+library(RColorBrewer)
+library(gplots)
 ```
 
-## R Markdown
+# 1. INTRODUCTION
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## 1.1 Motivation and Objective
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+In this project, I use a dataset that contains different attributes and catch rates for various pokemons to try to understand the relationship between these attributes and catch rates. Here are some questions I want to anwser: Which predictor(s) play important roles in predicting catch rates? Which type of model (linear or non-linear) serves as a better method to predict the catch rate?
 
-```{r cars}
-summary(cars)
+## 1.2 Data Preparation and Cleaning
+
+The original dataset has 20 predictors such as HP, and the outcome 'catch_rate'. After cleaning the names of these variables, I did the following steps to clean the data:
+
+1.2.1 Notice that 'type_2' and 'egg_group_2' are indicators of if a pokemon has a second type or belongs to a second egg group. The 'Null' values in the data means the pokemon does not has the second type/group, so I changed them into "none" to make them as a category to be meaningful;
+
+1.2.2 The 'generation' predictor is originally a numeric type, but it has only 6 integer values, so I decided to mutate it to be categorical;
+
+1.2.3. Irrelevant variables 'number' and 'name' are dropped. 'total', which is the total base battle statistic for each pokemon, is calculated and reflected in other battle attributes such as 'hp' and 'attack'. So I dropped it to avoid intercollinearity. Later, after plotting the correlation map, I found 'weight_kg' and 'height_m' has relatively high correlation(correlation plot is shown in section 2). After consideration,  I chose to drop 'height_m' since it may has less effect on catch rate compared to 'weight_kg'. 'has_gender' is also dropped because all values are "TRUE".
+
+
+# 2. Exploratory Analysis / Visualization
+
+
+# 3. Models
+
+## 3.1 Bagging, Boosting, Random Forest
+
+## 3.2 SVM
+
+## 3.3 Clustering
+
+In order to have a better visualization of the relationship between the pokemon and their different attributes, we use both k-means clustering and hierarchical clustering to group similar pokemons together. Here, we use only numerical variables.
+As can see from k-means clustering, we use the optimal number of clusters = 3 and use Euclidean distance to decide the similarity. From the plot briefly, cluster 1 tends to has lower hp, cluster 2 has lower catch_rate, and cluster 3 has relatively higher weight and defense.
+For the hierarchical clustering, we use complete linkage(maximal inter-cluster dissimilarity) and euclidean distance. Since hierarchical clustering provides us all the possible combinations of clusters, to visualize, we made a heat map to see how all the variables vary for each observation. From the heat map, we found pokemons that have higher hp, height, and weight tend to have lower catch_rate, whereas those which have relatively low combat attributes tend to have higher catch_rate.
+
+```{r}
+# reorganize data to be used
+poke_cluster = read_csv("./pokemon.csv") %>%
+  janitor::clean_names() %>%
+  dplyr::select(hp, attack, defense, sp_atk, sp_def, speed, height_m, weight_kg, catch_rate) %>%
+  na.omit() %>%
+  scale()
+
+# k-mean clustering, using optimal number of clusters = 3
+optimal_cluster = fviz_nbclust(poke_cluster, FUNcluster = kmeans, method = "silhouette")
+set.seed(1)
+cluster_km = kmeans(poke_cluster, centers = 3, nstart = 30)
+cluster_km_vis = fviz_cluster(list(data = poke_cluster, cluster = cluster_km$cluster),
+                              ellipse.type = "convex",
+                              geom = c("point", "text"),
+                              labelsize = 5,
+                              palette = "Dark2") + labs(title = "K-means Clustering")
+
+# show k-means clustering plot
+cluster_km_vis
+
+# hierarchical clustering
+col1 = colorRampPalette(brewer.pal(9, "PRGn"))(100)
+
+# show hierarchical clustering heat map
+heatmap.2(t(poke_cluster),
+          col = col1, keysize = 0.9, key.par = list(cex = 0.5),
+          trace = "none", key = TRUE, cexCol = 0.75,
+          margins = c(10, 10))
+
+# check for different clusters' members
+hc_complete = hclust(dist(poke_cluster), method = "complete")
+hc_dendrogram = fviz_dend(hc_complete, k = 8, cex = 0.3, palette = "jco",
+             color_labels_by_k = TRUE,
+             rect = TRUE, rect_fill = TRUE, rect_border = "jco",
+             labels_track_height = 2.5)
+
+# for example, for group_8 members, they have high weight, high height, high hp, and have other high attributes relatively
+group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 ```
 
-## Including Plots
+# 4. Conclusions
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# 5. Limitations

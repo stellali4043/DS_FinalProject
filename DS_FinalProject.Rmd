@@ -1,6 +1,6 @@
 ---
 title: "P8106 Final Project"
-author: "Phoebe Mo(km3624), Stella Li(), Yihan Feng()"
+author: "Phoebe Mo(km3624), Stella Li(cl4043), Yihan Feng()"
 date: "5/7/2021"
 output:
   pdf_document:
@@ -8,6 +8,11 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning=FALSE)
+```
+
+
+```{r}
 library(tidyverse)
 library(RColorBrewer)
 library(factoextra)
@@ -15,13 +20,16 @@ library(RColorBrewer)
 library(gplots)
 library(randomForest)
 library(e1071)
+library(ranger)
+library(gbm)
+library(xgboost)
 ```
 
 # 1. INTRODUCTION
 
 ## 1.1 Motivation and Objective
 
-Pokemon are fictional creatures, which can be captured by players and trained to battle each other for sport games. In this project, we use a dataset that contains different attributes and catch rates for 721 unique Pokemons to try to understand the relationship between these attributes and catch rates. Here are some questions we want to answer: Which predictor(s) play important roles in predicting catch rates? Which type of model (linear or non-linear) serves as a better method to predict the catch rate?
+Pokemon are fictional creatures, which can be captured by players and trained to battle each other in the augmented reality game Pokémon Go!. In this project, we use a dataset from Kaggle that contains different attributes and catch rates for 721 unique Pokemons. We try to understand the relationship between Pokemons' different attributes and their respective catch rates. Here are some questions we want to answer: Which predictor(s) play important roles in predicting catch rates? Which type of model (linear or non-linear) serves as a better method to predict the catch rate?
 
 ## 1.2 Data Preparation and Cleaning
 
@@ -36,6 +44,19 @@ The original dataset has 20 predictors such as HP, and the outcome 'catch_rate'.
 
 # 2. Exploratory Analysis / Visualization
 
+```{r}
+theme1 <- trellis.par.get()
+theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
+theme1$plot.symbol$pch <- 16
+theme1$plot.line$col <- rgb(.8, .1, .1, 1) 
+theme1$plot.line$lwd <- 2 
+theme1$strip.background$col <- rgb(.0, .2, .6, .2) 
+trellis.par.set(theme1)
+featurePlot(x = trainData[, 2:7], y = trainData$catch_rate,
+            plot = "scatter",
+            span = .5,
+            labels = c("Predictors","catch_rate"), type = c("p", "smooth"), layout = c(2,3))
+```
 
 # 3. Models
 
@@ -64,16 +85,55 @@ trRows = createDataPartition(pkmn.df$catch_rate,
 
 
 ```{r}
+# Boosting
+ctrl <- trainControl(method = "cv") 
+
+gbm.grid <- expand.grid(n.trees = c(2000,3000,4000),
+                        interaction.depth = 1:4,
+                        shrinkage = c(0.001,0.003,0.005),
+                        n.minobsinnode = c(1,10))
+set.seed(1)
+gbm.fit <- train(catch_rate ~ ., 
+                 pkmn.df[trRows,], 
+                 method = "gbm",
+                 tuneGrid = gbm.grid,
+                 trControl = ctrl,
+                 verbose = FALSE)
+
+ggplot(gbm.fit, highlight = TRUE)
+```
+
+```{r}
 # Random Forest
+set.seed(2021)
+
 rf.fit = randomForest(catch_rate ~ .,
                       pkmn.df,
                       subset = trRows,
                       mtry = 6)
 
+pred.rf <- predict(rf.fit, newdata = pkmn.df[-trRows,])
 rf.pred = predict(rf.fit, newdata = pkmn.df[-trRows,])
 rf.rmse = RMSE(pred.rf, pkmn.df$catch_rate[-trRows])
-```
+rf.rmse
 
+# Bagging
+set.seed(2021)
+bagging <- randomForest(catch_rate ~ .,
+                        pkmn.df,
+                        subset = trRows,
+                        mtry = 19)
+
+# fast implementation
+set.seed(2021)
+rf2 <- ranger(catch_rate ~ .,
+              pkmn.df[trRows,],
+              mtry = 6) 
+
+pred.rf2 <- predict(rf2, data = pkmn.df[-trRows,])$predictions
+rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[-trRows])
+rf.rmse2
+```
 
 ## 3.2 SVM
 
@@ -86,6 +146,11 @@ svmr.fit = tune.svm(catch_rate ~. ,
 
 svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[-trRows,])
 svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[-trRows])
+```
+
+```{r}
+resamp <- resamples(list(rf = rf.fit, rf2 = rf2, gbm = gbm.fit, svmr = svmr.fit))
+summary(resamp)
 ```
 
 ## 3.3 Clustering

@@ -100,6 +100,10 @@ gbm.fit <- train(catch_rate ~ .,
                  trControl = ctrl,
                  verbose = FALSE)
 
+gbm.pred = predict(gbm.fit, newdata = pkmn.df[-trRows,])
+gbm.rmse = RMSE(gbm.pred, pkmn.df$catch_rate[-trRows])
+gbm.rmse
+
 ggplot(gbm.fit, highlight = TRUE)
 ```
 
@@ -112,7 +116,6 @@ rf.fit = randomForest(catch_rate ~ .,
                       subset = trRows,
                       mtry = 6)
 
-pred.rf <- predict(rf.fit, newdata = pkmn.df[-trRows,])
 rf.pred = predict(rf.fit, newdata = pkmn.df[-trRows,])
 rf.rmse = RMSE(pred.rf, pkmn.df$catch_rate[-trRows])
 rf.rmse
@@ -126,11 +129,11 @@ bagging <- randomForest(catch_rate ~ .,
 
 # fast implementation
 set.seed(2021)
-rf2 <- ranger(catch_rate ~ .,
+rf2.fit <- ranger(catch_rate ~ .,
               pkmn.df[trRows,],
               mtry = 6) 
 
-pred.rf2 <- predict(rf2, data = pkmn.df[-trRows,])$predictions
+pred.rf2 <- predict(rf2.fit, data = pkmn.df[-trRows,])$predictions
 rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[-trRows])
 rf.rmse2
 ```
@@ -149,7 +152,7 @@ svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[-trRows])
 ```
 
 ```{r}
-resamp <- resamples(list(rf = rf.fit, rf2 = rf2, gbm = gbm.fit, svmr = svmr.fit))
+resamp <- resamples(list(rf = rf.fit, rf2 = rf2.fit, gbm = gbm.fit, svmr = svmr.fit))
 summary(resamp)
 ```
 

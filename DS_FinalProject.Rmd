@@ -7,12 +7,8 @@ output:
     latex_engine: xelatex
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning=FALSE)
-```
 
-
-```{r}
+```{r warning=FALSE, message=FALSE}
 library(tidyverse)
 library(RColorBrewer)
 library(factoextra)
@@ -23,6 +19,8 @@ library(e1071)
 library(ranger)
 library(gbm)
 library(xgboost)
+library(lattice)
+library(caret)
 ```
 
 # 1. INTRODUCTION
@@ -41,28 +39,7 @@ The original dataset has 20 predictors such as HP, and the outcome 'catch_rate'.
 
 1.2.3. Irrelevant variables 'number' and 'name' are dropped. 'total', which is the total base battle statistic for each pokemon, is calculated and reflected in other battle attributes such as 'hp' and 'attack'. So I dropped it to avoid intercollinearity. Later, after plotting the correlation map, I found 'weight_kg' and 'height_m' has relatively high correlation(correlation plot is shown in section 2). After consideration,  I chose to drop 'height_m' since it may has less effect on catch rate compared to 'weight_kg'. 'has_gender' is also dropped because all values are "TRUE".
 
-
-# 2. Exploratory Analysis / Visualization
-
-```{r}
-theme1 <- trellis.par.get()
-theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
-theme1$plot.symbol$pch <- 16
-theme1$plot.line$col <- rgb(.8, .1, .1, 1) 
-theme1$plot.line$lwd <- 2 
-theme1$strip.background$col <- rgb(.0, .2, .6, .2) 
-trellis.par.set(theme1)
-featurePlot(x = trainData[, 2:7], y = trainData$catch_rate,
-            plot = "scatter",
-            span = .5,
-            labels = c("Predictors","catch_rate"), type = c("p", "smooth"), layout = c(2,3))
-```
-
-# 3. Models
-
-## 3.1 Bagging, Boosting, Random Forest
-
-```{r}
+```{r message=FALSE, warning=FALSE}
 # data input
 pkmn.df = read.csv("./pokemon.csv") %>%
   janitor::clean_names() %>%
@@ -83,6 +60,25 @@ trRows = createDataPartition(pkmn.df$catch_rate,
                              list = FALSE)
 ```
 
+# 2. Exploratory Analysis / Visualization
+
+```{r}
+theme1 <- trellis.par.get()
+theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
+theme1$plot.symbol$pch <- 16
+theme1$plot.line$col <- rgb(.8, .1, .1, 1) 
+theme1$plot.line$lwd <- 2 
+theme1$strip.background$col <- rgb(.0, .2, .6, .2) 
+trellis.par.set(theme1)
+featurePlot(x = pkmn.df[, 3:8], y = pkmn.df$catch_rate,
+            plot = "scatter",
+            span = .5,
+            labels = c("Predictors","catch_rate"), type = c("p", "smooth"), layout = c(2,3))
+```
+
+# 3. Models
+
+## 3.1 Bagging, Boosting, Random Forest
 
 ```{r}
 # Boosting

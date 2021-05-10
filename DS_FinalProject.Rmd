@@ -13,13 +13,15 @@ library(RColorBrewer)
 library(factoextra)
 library(RColorBrewer)
 library(gplots)
+library(randomForest)
+library(e1071)
 ```
 
 # 1. INTRODUCTION
 
 ## 1.1 Motivation and Objective
 
-In this project, I use a dataset that contains different attributes and catch rates for various pokemons to try to understand the relationship between these attributes and catch rates. Here are some questions I want to anwser: Which predictor(s) play important roles in predicting catch rates? Which type of model (linear or non-linear) serves as a better method to predict the catch rate?
+Pokemon are fictional creatures, which can be captured by players and trained to battle each other for sport games. In this project, we use a dataset that contains different attributes and catch rates for 721 unique Pokemons to try to understand the relationship between these attributes and catch rates. Here are some questions we want to answer: Which predictor(s) play important roles in predicting catch rates? Which type of model (linear or non-linear) serves as a better method to predict the catch rate?
 
 ## 1.2 Data Preparation and Cleaning
 
@@ -39,7 +41,52 @@ The original dataset has 20 predictors such as HP, and the outcome 'catch_rate'.
 
 ## 3.1 Bagging, Boosting, Random Forest
 
+```{r}
+# data input
+pkmn.df = read.csv("./pokemon.csv") %>%
+  janitor::clean_names() %>%
+  mutate(type_2 = replace_na(type_2, "none"),
+         egg_group_2 = replace_na(egg_group_2, "none")
+         ) %>%
+  dplyr::select(-number, -total, -name, -has_gender) %>%
+  na.omit()
+
+factor.cols = c("type_1", "type_2", "is_legendary", "color", "egg_group_1", "egg_group_2", "has_mega_evolution", "body_style")
+
+pkmn.df = pkmn.df %>% 
+  mutate_at(factor.cols, funs(factor(.)))
+
+# set training and testing
+trRows = createDataPartition(pkmn.df$catch_rate,
+                             p = 0.75,
+                             list = FALSE)
+```
+
+
+```{r}
+# Random Forest
+rf.fit = randomForest(catch_rate ~ .,
+                      pkmn.df,
+                      subset = trRows,
+                      mtry = 6)
+
+rf.pred = predict(rf.fit, newdata = pkmn.df[-trRows,])
+rf.rmse = RMSE(pred.rf, pkmn.df$catch_rate[-trRows])
+```
+
+
 ## 3.2 SVM
+
+```{r}
+svmr.fit = tune.svm(catch_rate ~. ,
+                    data = pkmn.df[trRows,],
+                    kernel = "radial",
+                    epsilon = exp(seq(-5, 0, len = 20)),
+                    gamma = exp(seq(-6, -2, len = 10)))
+
+svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[-trRows,])
+svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[-trRows])
+```
 
 ## 3.3 Clustering
 

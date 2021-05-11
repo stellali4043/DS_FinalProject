@@ -21,6 +21,8 @@ library(gbm)
 library(xgboost)
 library(lattice)
 library(caret)
+library(corrplot)
+library(mgcv)
 ```
 
 # 1. INTRODUCTION
@@ -62,6 +64,8 @@ trRows = createDataPartition(pkmn.df$catch_rate,
 
 # 2. Exploratory Analysis / Visualization
 
+After plotting scatter plots for continuous predictors and boxplots for categorical predictors, significant trends were not observed in different types, egg groups, body_styles or colors. However, the battle attributes: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', and 'speed' seem to have a negative association with catch rate. The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
+
 ```{r}
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
@@ -76,10 +80,17 @@ featurePlot(x = pkmn.df[, 3:8], y = pkmn.df$catch_rate,
             labels = c("Battel Feature Predictors","Catch Rate"), type = c("p", "smooth"), layout = c(2,3))
 
 
-total.plot = ggplot(pkmn.df, aes(x = total, y = catch_rate)) + 
+# reread the data, since we need to use the 'total' variable here for visualization
+pkmn.df.vis = read_csv("./pokemon.csv") %>% janitor::clean_names()
+total.plot = ggplot(pkmn.df.vis, aes(x = total, y = catch_rate)) + 
   geom_point() +
   labs(title = "Figure 2. Scatterplot of total battle features vs. catch rate")
 total.plot
+
+# checking correlation between continuous predictors
+# height_m and weight_kg have high correlation = 0.63. So going to drop one of them, here I choose to drop height_m.
+cor(pkmn.df %>% dplyr::select(-c(type_1, type_2, generation, is_legendary, color, egg_group_1, egg_group_2, body_style, has_mega_evolution))) %>%
+  corrplot(method = "circle", type = "upper", diag = F)
 ```
 
 # 3. Models
@@ -107,11 +118,23 @@ The dataset for analysis contains 644 samples and 18 predictors:
 * `catch_rate`: the response (on 0 - 255 scale)
 
 
-The dataset is split into 75:25 training to test dataset. We choose Boosting, Random Forest, Bagging, and Support Vector Machine models to train the data with cross validation. RMSE is used to compare and choose the final model. 
+The dataset is split into 75:25 training to test dataset. We include GAM model, which has a dominant performance among some other methods(e.g. lda, qda, nb, lasso, ridge...), as a competitive model for predicting the catch rate. We also choose Boosting, Random Forest, Bagging, and Support Vector Machine models to train the data with cross validation. RMSE is used to compare and choose the final model. Finally, we use clustering to have a better visualization of pokemons that have similar attributes and to see if significant relationship between combat attributes and catch rate can be found in it.
 
-Assumption: 
 
-## 3.1 Bagging, Boosting, Random Forest
+## 3.1 GAM
+
+```{r}
+set.seed(1)
+gam_fit = gam(catch_rate ~ type_1 + type_2 + s(hp) + s(attack) + s(defense) + s(sp_atk) + s(sp_def) + s(speed) + generation + is_legendary + color + pr_male + egg_group_1 + egg_group_2 + has_mega_evolution + s(weight_kg) + body_style, data = pkmn.df[trRows, ])
+
+#gam_plot = plot(gam_fit, scale = 0)
+gam.rmse = sqrt(mean((pkmn.df$catch_rate[trRows] - predict(gam_fit, newdata = pkmn.df[trRows, ])) ^ 2)) # gam.rmse = 42.10908
+```
+
+
+## 3.2 Bagging, Boosting, Random Forest
+
+We decide to use tree-based ensemble methods for regression.
 
 ```{r}
 # Boosting
@@ -131,9 +154,9 @@ gbm.fit <- train(catch_rate ~ .,
 
 gbm.pred = predict(gbm.fit, newdata = pkmn.df[-trRows,])
 gbm.rmse = RMSE(gbm.pred, pkmn.df$catch_rate[-trRows])
-gbm.rmse
+gbm.rmse # gbm.rmse = 38.38418
 
-ggplot(gbm.fit, highlight = TRUE)
+# ggplot(gbm.fit, highlight = TRUE)
 ```
 
 ```{r}
@@ -166,9 +189,9 @@ rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[-trRows])
 rf.rmse2
 ```
 
-## 3.2 SVM
+## 3.3 SVM
 
-Support Vector Machine with both linear and radial kernel is used to train the data. 
+In SVM, we want to find a separating hyperplane that maximizes the gap between classes to optimally predict the outcome. Support Vector Machine with both linear and radial kernel is used to train the data. The tuning parameter epsilon(trade-off between correct classification and maximization of the gap) and gamma(how non-linear the fit could be) are tuned given a suitable range of numbers in the function.
 
 ```{r}
 # linear kernel
@@ -192,16 +215,6 @@ svmr.fit = tune.svm(catch_rate ~. ,
 
 svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[-trRows,])
 svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[-trRows])
-```
-
-
-## 3.3 Final Model and Visualization
-
-```{r}
-final.model.table = data.frame(model = rep(c("Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")),
-                               RMSE = rep(c(rf.rmse, rf.rmse, rf.rmse2, svml.rmse, svmr.rmse))) %>%
-  knitr::kable()
-final.model.table
 ```
 
 ## 3.4 Clustering
@@ -257,6 +270,23 @@ group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 
 ```
 
+## 3.6 Final Model and Visualization
+
+```{r}
+final.model.table = data.frame(model = rep(c("Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")),
+                               RMSE = rep(c(rf.rmse, rf.rmse, rf.rmse2, svml.rmse, svmr.rmse))) %>%
+  knitr::kable()
+final.model.table
+```
+
+
 # 4. Conclusions
 
+
 # 5. Limitations
+
+5.1 The GAM model does not truly select the tuning parameter and do the model training, therefore this may be the limitation in the GAM model. However, since it has the smallest training RMSE, it is still chosen as our best method to do the prediction in this project.
+
+5.2 For the k-means clustering, since we need to decide k ourselves, there is no reference for us to decide which k is better. So the manually selected k and the given visualization may not be the best presentation.
+
+

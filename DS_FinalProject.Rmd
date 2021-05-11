@@ -73,10 +73,43 @@ trellis.par.set(theme1)
 featurePlot(x = pkmn.df[, 3:8], y = pkmn.df$catch_rate,
             plot = "scatter",
             span = .5,
-            labels = c("Predictors","catch_rate"), type = c("p", "smooth"), layout = c(2,3))
+            labels = c("Battel Feature Predictors","Catch Rate"), type = c("p", "smooth"), layout = c(2,3))
+
+
+total.plot = ggplot(pkmn.df, aes(x = total, y = catch_rate)) + 
+  geom_point() +
+  labs(title = "Figure 2. Scatterplot of total battle features vs. catch rate")
+total.plot
 ```
 
 # 3. Models
+
+The dataset for analysis contains 644 samples and 18 predictors: 
+
+* `type_1`
+* `typw_2 `
+* `hp`: health point
+* `attack`
+* `defense`
+* `sp_atk`: attack speed
+* `sp_def`: defense speed
+* `speed`
+* `generation`
+* `is_legendary`
+* `color`
+* `pr_male`: probability of being a male Pokemon
+* `egg_group_1`
+* `egg_group_2`
+* `has_mega_evolution`
+* `height_m`
+* `weight_kg`
+* `body_style`
+* `catch_rate`: the response (on 0 - 255 scale)
+
+
+The dataset is split into 75:25 training to test dataset. We choose Boosting, Random Forest, Bagging, and Support Vector Machine models to train the data with cross validation. RMSE is used to compare and choose the final model. 
+
+Assumption: 
 
 ## 3.1 Bagging, Boosting, Random Forest
 
@@ -106,15 +139,14 @@ ggplot(gbm.fit, highlight = TRUE)
 ```{r}
 # Random Forest
 set.seed(2021)
-
 rf.fit = randomForest(catch_rate ~ .,
                       pkmn.df,
                       subset = trRows,
                       mtry = 6)
 
 rf.pred = predict(rf.fit, newdata = pkmn.df[-trRows,])
-rf.rmse = RMSE(pred.rf, pkmn.df$catch_rate[-trRows])
-rf.rmse
+rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[-trRows])
+
 
 # Bagging
 set.seed(2021)
@@ -136,7 +168,22 @@ rf.rmse2
 
 ## 3.2 SVM
 
+Support Vector Machine with both linear and radial kernel is used to train the data. 
+
 ```{r}
+# linear kernel
+set.seed(2021)
+svml.fit = tune.svm(catch_rate ~ .,
+                    data = pkmn.df[trRows,],
+                    kernel = "linear",
+                    epsilon = exp(seq(-5, 0, len = 20)))
+
+svml.pred = predict(svml.fit$best.model, newdata = pkmn.df[-trRows,])
+svml.rmse = RMSE(svml.pred, pkmn.df$catch_rate[-trRows])
+
+
+# radial kernel
+set.seed(2021)
 svmr.fit = tune.svm(catch_rate ~. ,
                     data = pkmn.df[trRows,],
                     kernel = "radial",
@@ -147,12 +194,17 @@ svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[-trRows,])
 svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[-trRows])
 ```
 
+
+## 3.3 Final Model and Visualization
+
 ```{r}
-resamp <- resamples(list(rf = rf.fit, rf2 = rf2.fit, gbm = gbm.fit, svmr = svmr.fit))
-summary(resamp)
+final.model.table = data.frame(model = rep(c("Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")),
+                               RMSE = rep(c(rf.rmse, rf.rmse, rf.rmse2, svml.rmse, svmr.rmse))) %>%
+  knitr::kable()
+final.model.table
 ```
 
-## 3.3 Clustering
+## 3.4 Clustering
 
 In order to have a better visualization of the relationship between the pokemon and their different attributes, we use both k-means clustering and hierarchical clustering to group similar pokemons together. Here, we use only numerical variables.
 As can see from k-means clustering, we use the optimal number of clusters = 3 and use Euclidean distance to decide the similarity. From the plot briefly, cluster 1 tends to has lower hp, cluster 2 has lower catch_rate, and cluster 3 has relatively higher weight and defense.
@@ -197,6 +249,12 @@ hc_dendrogram = fviz_dend(hc_complete, k = 8, cex = 0.3, palette = "jco",
 
 # for example, for group_8 members, they have high weight, high height, high hp, and have other high attributes relatively
 group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
+```
+
+## 3.5 Variable Importance
+
+```{r}
+
 ```
 
 # 4. Conclusions

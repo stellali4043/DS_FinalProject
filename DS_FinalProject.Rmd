@@ -123,6 +123,10 @@ The dataset is split into 75:25 training to test dataset. We include GAM model, 
 
 ## 3.1 GAM
 
+Based on the visualization plots, we can see that some continuous variables have curve-like trend in the right tail. In this case, I consider using GAM model in order to include this trend into the analysis. For such predictors, I allow GAM to make it non-parametric smoothing term. GCV is used to choose the degree of freedom for the model. 
+
+After fitting, it is observed that the smooth terms of 'hp', 'attack', 'defense', 'sp_atk', 'speed', and the coefficients of 'type_1Poison', 'type_2Water', 'generation3', 'pr_male', 'egg_group_1Undiscovered', 'body_stylemultiple_bodies', are significant. These result greatly coincides with the ones given by previous model.
+
 ```{r}
 set.seed(1)
 gam_fit = gam(catch_rate ~ type_1 + type_2 + s(hp) + s(attack) + s(defense) + s(sp_atk) + s(sp_def) + s(speed) + generation + is_legendary + color + pr_male + egg_group_1 + egg_group_2 + has_mega_evolution + s(weight_kg) + body_style, data = pkmn.df[trRows, ])

@@ -404,7 +404,7 @@ We found Pokemons that have higher hp, height, and weight tend to have lower cat
 
 \newpage
 
-```{r eval=FALSE}
+```{r echo=FALSE}
 total.plot
 ```
 
@@ -424,6 +424,6 @@ total.plot
 \newpage
 
 
-```{r eval=FALSE}
+```{r echo=FALSE}
 final_rmse1
 ```

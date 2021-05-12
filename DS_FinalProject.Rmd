@@ -23,6 +23,8 @@ library(lattice)
 library(caret)
 library(corrplot)
 library(mgcv)
+library(kableExtra)
+library(vip)
 ```
 
 # 1. INTRODUCTION
@@ -158,13 +160,13 @@ gbm.fit <- train(catch_rate ~ .,
 
 gbm.pred = predict(gbm.fit, newdata = pkmn.df[trRows,])
 gbm.rmse = RMSE(gbm.pred, pkmn.df$catch_rate[trRows])
-gbm.rmse # gbm.rmse = 38.38418
+gbm.rmse # gbm.rmse = 19.87961
 
 gbm.plot <- ggplot(gbm.fit, highlight = TRUE)
 ggsave(gbm.plot, file="gbm_plot.pdf", scale=2)
 ```
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 # Random Forest
 set.seed(2021)
 rf.fit = randomForest(catch_rate ~ .,
@@ -174,7 +176,7 @@ rf.fit = randomForest(catch_rate ~ .,
 
 rf.pred = predict(rf.fit, newdata = pkmn.df[trRows,])
 rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
-
+rf.rmse
 
 # Bagging
 set.seed(2021)
@@ -182,6 +184,10 @@ bagging <- randomForest(catch_rate ~ .,
                         pkmn.df,
                         subset = trRows,
                         mtry = 19)
+
+bagging.pred = predict(bagging, newdata = pkmn.df[trRows,])
+bagging.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
+bagging.rmse
 
 # fast implementation
 set.seed(2021)
@@ -198,7 +204,7 @@ rf.rmse2
 
 In SVM, we want to find a separating hyperplane that maximizes the gap between classes to optimally predict the outcome. Support Vector Machine with both linear and radial kernel is used to train the data. The tuning parameter epsilon(trade-off between correct classification and maximization of the gap) and gamma(how non-linear the fit could be) are tuned given a suitable range of numbers in the function.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 # linear kernel
 set.seed(2021)
 svml.fit = tune.svm(catch_rate ~ .,
@@ -220,6 +226,9 @@ svmr.fit = tune.svm(catch_rate ~. ,
 
 svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[trRows,])
 svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[trRows])
+
+svml.rmse
+svmr.rmse
 ```
 
 ## 3.4 Clustering
@@ -228,7 +237,7 @@ In order to have a better visualization of the relationship between the pokemon 
 As can see from k-means clustering, we use the optimal number of clusters = 3 and use Euclidean distance to decide the similarity. From the plot briefly, cluster 1 tends to has lower hp, cluster 2 has lower catch_rate, and cluster 3 has relatively higher weight and defense.
 For the hierarchical clustering, we use complete linkage(maximal inter-cluster dissimilarity) and euclidean distance. Since hierarchical clustering provides us all the possible combinations of clusters, to visualize, we made a heat map to see how all the variables vary for each observation. From the heat map, we found pokemons that have higher hp, height, and weight tend to have lower catch_rate, whereas those which have relatively low combat attributes tend to have higher catch_rate.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 # reorganize data to be used
 poke_cluster = read_csv("./pokemon.csv") %>%
   janitor::clean_names() %>%
@@ -271,17 +280,25 @@ group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 
 ## 3.5 Variable Importance
 
-```{r}
+```{r message=FALSE, warning=FALSE}
+set.seed(2021)
+vip(rf.fit,method = "permute",train = pkmn.df[trRows,],
+    target = "catch_rate",metric = "RMSE",nsim = 10,
+    pred_wrapper = predict,geom = "boxplot",
+    all_permutations = TRUE,mapping =aes_string(fill = "Variable"))
 
+variance_importance <- ggplot(gbm.fit, highlight = TRUE)
+ggsave(variance_importance, file="Variance Importance.pdf", scale=2)
 ```
 
 ## 3.6 Final Model and Visualization
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 final.model.table = data.frame(model = rep(c("Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")),
-                               RMSE = rep(c(rf.rmse, rf.rmse, rf.rmse2, svml.rmse, svmr.rmse))) %>%
+                               RMSE = rep(c(gbm.rmse, rf.rmse, rf.rmse2, svml.rmse, svmr.rmse))) %>%
   knitr::kable()
-final.model.table
+final.model.table %>%
+  kable_classic(full_width = F, html_font = "Cambria")
 ```
 
 

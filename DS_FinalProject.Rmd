@@ -99,24 +99,24 @@ cor(pkmn.df %>% dplyr::select(-c(type_1, type_2, generation, is_legendary, color
 
 The dataset for analysis contains 644 samples and 18 predictors: 
 
-* `type_1`
-* `typw_2 `
+* `type_1`: primary type
+* `typw_2 `: second type, in case the Pokémon has it
 * `hp`: health point
-* `attack`
-* `defense`
+* `attack`: base attack
+* `defense`: base defense
 * `sp_atk`: attack speed
 * `sp_def`: defense speed
-* `speed`
-* `generation`
-* `is_legendary`
-* `color`
+* `speed`: base speed
+* `generation`: number of the generation when the Pokémon was introduced
+* `is_legendary`: Boolean that indicates whether the Pokémon is Legendary or not
+* `color`: color of the Pokémon according to the Pokédex
 * `pr_male`: probability of being a male Pokemon
-* `egg_group_1`
-* `egg_group_2`
-* `has_mega_evolution`
-* `height_m`
-* `weight_kg`
-* `body_style`
+* `egg_group_1`: egg group of the Pokémon
+* `egg_group_2`: second egg group of the Pokémon, in case it has two
+* `has_mega_evolution`: Boolean that indicates whether the Pokémon is able to Mega-evolve or not
+* `height_m`: height of the Pokémon, in meters
+* `weight_kg`: weight of the Pokémon, in kilograms
+* `body_style`: body style of the Pokémon according to the Pokédex
 * `catch_rate`: the response (on 0 - 255 scale)
 
 
@@ -142,12 +142,66 @@ gam.rmse = sqrt(mean((pkmn.df$catch_rate[trRows] - predict(gam_fit, newdata = pk
 
 We decide to use tree-based ensemble methods for regression.
 
-```{r warning=FALSE, message=FALSE}
-# Boosting
+```{r message=FALSE, warning=FALSE}
+# Random Forest
+set.seed(2021)
+rf.fit = randomForest(catch_rate ~ .,
+                      pkmn.df,
+                      subset = trRows,
+                      mtry = 6)
+
+rf.pred = predict(rf.fit, newdata = pkmn.df[trRows,])
+rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
+rf.rmse
+
+# Bagging
+set.seed(2021)
+bagging <- randomForest(catch_rate ~ .,
+                        pkmn.df,
+                        subset = trRows,
+                        mtry = 18)
+
+bagging.pred = predict(bagging, newdata = pkmn.df[trRows,])
+bagging.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
+bagging.rmse
+
+# fast implementation
+set.seed(2021)
+rf2.fit <- ranger(catch_rate ~ .,
+              pkmn.df[trRows,],
+              mtry = 6) 
+
+pred.rf2 <- predict(rf2.fit, data = pkmn.df[trRows,])$predictions
+rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[trRows])
+rf.rmse2
+```
+
+```{r message=FALSE, warning=FALSE}
+# Grid search using `caret`, and use the fast implementation of random forest when tuning the model.
+
 ctrl <- trainControl(method = "cv") 
 
+# Try more if possible
+rf.grid <- expand.grid(mtry = 1:18,
+                       splitrule = "variance",
+                       min.node.size = 1:6)
+
+set.seed(2021)
+rf.fit <- train(catch_rate ~ . , 
+                pkmn.df[trRows,], 
+                method = "ranger",
+                tuneGrid = rf.grid,
+                trControl = ctrl)
+
+ggplot(rf.fit, highlight = TRUE)
+```
+
+```{r warning=FALSE, message=FALSE}
+# Boosting
+# We then tune the `gbm` model.
+
 gbm.grid <- expand.grid(n.trees = c(2000,3000,4000),
-                        interaction.depth = 1:4,
+                        interaction.depth = 1:3,
                         shrinkage = c(0.001,0.003,0.005),
                         n.minobsinnode = c(1,10))
 set.seed(1)
@@ -166,39 +220,7 @@ gbm.plot <- ggplot(gbm.fit, highlight = TRUE)
 ggsave(gbm.plot, file="gbm_plot.pdf", scale=2)
 ```
 
-```{r message=FALSE, warning=FALSE}
-# Random Forest
-set.seed(2021)
-rf.fit = randomForest(catch_rate ~ .,
-                      pkmn.df,
-                      subset = trRows,
-                      mtry = 6)
 
-rf.pred = predict(rf.fit, newdata = pkmn.df[trRows,])
-rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
-rf.rmse
-
-# Bagging
-set.seed(2021)
-bagging <- randomForest(catch_rate ~ .,
-                        pkmn.df,
-                        subset = trRows,
-                        mtry = 19)
-
-bagging.pred = predict(bagging, newdata = pkmn.df[trRows,])
-bagging.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
-bagging.rmse
-
-# fast implementation
-set.seed(2021)
-rf2.fit <- ranger(catch_rate ~ .,
-              pkmn.df[trRows,],
-              mtry = 6) 
-
-pred.rf2 <- predict(rf2.fit, data = pkmn.df[trRows,])$predictions
-rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[trRows])
-rf.rmse2
-```
 
 ## 3.3 SVM
 
@@ -307,7 +329,7 @@ final.model.table %>%
 
 # 5. Limitations
 
-5.1 The GAM model does not truly select the tuning parameter and do the model training, therefore this may be the limitation in the GAM model. However, since it has the smallest training RMSE, it is still chosen as our best method to do the prediction in this project.
+5.1 The GAM model does not truly select the tuning parameter and do the model training, therefore this may be the limitation of the GAM model. However, since it has the smallest training RMSE, we still decide to choose it as our best method for the prediction in this project.
 
 5.2 For the k-means clustering, since we need to decide k ourselves, there is no reference for us to decide which k is better. So the manually selected k and the given visualization may not be the best presentation.
 

@@ -341,16 +341,11 @@ knitr::include_graphics("./plot/hc-heatmap.png")
 ## 3.6 Final Model and Visualization
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-#final.model.table = data.frame(model = rep(c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")), RMSE = rep(c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))) %>%
-#  knitr::kable(digits = 2, captions = "CV RMSE for Each Model")
-
 final_rmse = data.frame(
   Model = c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)"),
   RMSE = c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))
 
 final_rmse
-#final.model.table %>%
-#  kable_classic(full_width = F, html_font = "Cambria")
 ```
 
 

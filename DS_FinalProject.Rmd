@@ -8,7 +8,7 @@ output:
 ---
 
 
-```{r warning=FALSE, message=FALSE}
+```{r include=FALSE, echo=FALSE, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(RColorBrewer)
 library(factoextra)
@@ -25,6 +25,8 @@ library(corrplot)
 library(mgcv)
 library(kableExtra)
 library(vip)
+library(patchwork)
+library(kableExtra)
 ```
 
 # 1. INTRODUCTION
@@ -43,7 +45,7 @@ The original dataset has 20 predictors such as HP, and the outcome 'catch_rate'.
 
 1.2.3. Irrelevant variables 'number' and 'name' are dropped. 'total', which is the total base battle statistic for each pokemon, is calculated and reflected in other battle attributes such as 'hp' and 'attack'. So I dropped it to avoid intercollinearity. Later, after plotting the correlation map, I found 'weight_kg' and 'height_m' has relatively high correlation(correlation plot is shown in section 2). After consideration,  I chose to drop 'height_m' since it may has less effect on catch rate compared to 'weight_kg'. 'has_gender' is also dropped because all values are "TRUE".
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 # data input
 pkmn.df = read.csv("./pokemon.csv") %>%
   janitor::clean_names() %>%
@@ -68,7 +70,7 @@ trRows = createDataPartition(pkmn.df$catch_rate,
 
 After plotting scatter plots for continuous predictors and boxplots for categorical predictors, significant trends were not observed in different types, egg groups, body_styles or colors. However, the battle attributes: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', and 'speed' seem to have a negative association with catch rate. The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
 theme1$plot.symbol$pch <- 16
@@ -129,7 +131,7 @@ Based on the visualization plots, we can see that some continuous variables have
 
 After fitting, it is observed that the smooth terms of 'hp', 'attack', 'defense', 'sp_atk', 'speed', and the coefficients of 'type_1Poison', 'type_2Water', 'generation3', 'pr_male', 'egg_group_1Undiscovered', 'body_stylemultiple_bodies', are significant. These result greatly coincides with the ones given by previous model.
 
-```{r}
+```{r echo=FALSE, eval=FALSE}
 set.seed(1)
 gam_fit = gam(catch_rate ~ type_1 + type_2 + s(hp) + s(attack) + s(defense) + s(sp_atk) + s(sp_def) + s(speed) + generation + is_legendary + color + pr_male + egg_group_1 + egg_group_2 + has_mega_evolution + s(weight_kg) + body_style, data = pkmn.df[trRows, ])
 
@@ -145,7 +147,7 @@ Since Random Forest does not have any underlying models, so it does not have ass
 \newline
 For bagging, we used all 18 predictors for training. 
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 # Bagging
 set.seed(2021)
 bagging <- randomForest(catch_rate ~ .,
@@ -154,23 +156,36 @@ bagging <- randomForest(catch_rate ~ .,
                         mtry = 18)
 
 bagging.pred = predict(bagging, newdata = pkmn.df[trRows,])
-bagging.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
-bagging.rmse
+bagging.rmse = RMSE(bagging.pred, pkmn.df$catch_rate[trRows])
+bagging.rmse # 19.34998
+
+# Bagging using ranger
+set.seed(2021)
+bagging_2 <- ranger(catch_rate ~ .,
+              pkmn.df[trRows,],
+              mtry = 18,
+              importance = "permutation") 
+barplot(sort(ranger::importance(bagging_2), decreasing = FALSE), las = 2, horiz = TRUE, cex.names = 0.7, col = colorRampPalette(colors = c("red", "pink"))(5))
+
+pred.bag2 <- predict(bagging_2, data = pkmn.df[trRows,])$predictions
+bag2.rmse = RMSE(pred.bag2, pkmn.df$catch_rate[trRows]) #18.90574
+
 
 # Random Forest - fast implementation
 set.seed(2021)
 rf2.fit <- ranger(catch_rate ~ .,
               pkmn.df[trRows,],
-              mtry = 6) 
+              mtry = 6,
+              importance = "permutation") 
 
 pred.rf2 <- predict(rf2.fit, data = pkmn.df[trRows,])$predictions
 rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[trRows])
-rf.rmse2
+rf.rmse2 # 19.75706
 ```
 
 Boosting primarily aims at reducing bias and variance. For boosting, we first did a grid search using `caret`. We then used the fast implementation of random forest when tuning the model and tuned the gbm model based on its result.
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
  
 ctrl <- trainControl(method = "cv") 
 
@@ -188,7 +203,7 @@ rf.fit <- train(catch_rate ~ . ,
 ggplot(rf.fit, highlight = TRUE)
 ```
 
-```{r warning=FALSE, message=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, eval=FALSE}
 # Boosting
 
 gbm.grid <- expand.grid(n.trees = c(2000,3000,4000),
@@ -216,7 +231,7 @@ ggsave(gbm.plot, file="gbm_plot.pdf", scale=2)
 
 In SVM, we want to find a separating hyperplane that maximizes the gap between classes to optimally predict the outcome. Support Vector Machine with both linear and radial kernel is used to train the data. The tuning parameter epsilon(trade-off between correct classification and maximization of the gap) and gamma(how non-linear the fit could be) are tuned given a suitable range of numbers in the function.
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 # linear kernel
 set.seed(2021)
 svml.fit = tune.svm(catch_rate ~ .,
@@ -239,8 +254,8 @@ svmr.fit = tune.svm(catch_rate ~. ,
 svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[trRows,])
 svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[trRows])
 
-svml.rmse
-svmr.rmse
+# svml.rmse = 44.78799
+# svmr.rmse = 35.27461
 ```
 
 ## 3.4 Clustering
@@ -249,7 +264,7 @@ In order to have a better visualization of the relationship between the pokemon 
 As can see from k-means clustering, we use the optimal number of clusters = 3 and use Euclidean distance to decide the similarity. From the plot briefly, cluster 1 tends to has lower hp, cluster 2 has lower catch_rate, and cluster 3 has relatively higher weight and defense. \newline
 For the hierarchical clustering, we use complete linkage(maximal inter-cluster dissimilarity) and euclidean distance. Since hierarchical clustering provides us all the possible combinations of clusters, to visualize, we made a heat map to see how all the variables vary for each observation. From the heat map, we found pokemons that have higher hp, height, and weight tend to have lower catch_rate, whereas those which have relatively low combat attributes tend to have higher catch_rate.
 
-```{r message=FALSE, warning=FALSE}
+```{r eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # reorganize data to be used
 poke_cluster = read_csv("./pokemon.csv") %>%
   janitor::clean_names() %>%
@@ -290,32 +305,54 @@ hc_dendrogram = fviz_dend(hc_complete, k = 8, cex = 0.3, palette = "jco",
 group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 ```
 
-## 3.5 Variable Importance
+## 3.5 Variable Importance and Clustering Results
 
-```{r message=FALSE, warning=FALSE}
-set.seed(2021)
-vip(rf.fit,method = "permute",train = pkmn.df[trRows,],
-    target = "catch_rate",metric = "RMSE",nsim = 10,
-    pred_wrapper = predict,geom = "boxplot",
-    all_permutations = TRUE,mapping =aes_string(fill = "Variable"))
+```{r eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 
-variance_importance <- ggplot(gbm.fit, highlight = TRUE)
-ggsave(variance_importance, file="Variance Importance.pdf", scale=2)
+#set.seed(2021)
+#vip(rf2.fit,method = "permute", train = pkmn.df[trRows,],
+#    target = "catch_rate",metric = "RMSE", nsim = 10,
+#    pred_wrapper = predict, geom = "boxplot",
+#    all_permutations = TRUE,mapping = aes_string(fill = "Variable"))
+
+#variance_importance <- ggplot(gbm.fit, highlight = TRUE)
+#ggsave(variance_importance, file="Variance Importance.pdf", scale=2)
+
+rf_vi = barplot(sort(ranger::importance(rf2.fit), decreasing = FALSE),las = 2, horiz = TRUE, cex.names = 0.7,col = colorRampPalette(colors = c("lightgrey","lightpink"))(8))
+
+bag_vi = barplot(sort(ranger::importance(bagging_2), decreasing = FALSE),las = 2, horiz = TRUE, cex.names = 0.7,col = colorRampPalette(colors = c("lightgrey", "lightpink"))(8))
+
+boost_vi = summary(gbm.fit$finalModel, las = 2, cBars = 10, cex.names = 0.6)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+## attaching variable importance images
+knitr::include_graphics("./plot/rf_vi.png")
+knitr::include_graphics("./plot/bag_vi.png")
+knitr::include_graphics("./plot/boost_vi.png")
+knitr::include_graphics("./plot/k-mean-cluster-plot.png")
+knitr::include_graphics("./plot/hc-heatmap.png")
 ```
 
 ## 3.6 Final Model and Visualization
 
-```{r message=FALSE, warning=FALSE}
-final.model.table = data.frame(model = rep(c("Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")),
-                               RMSE = rep(c(gbm.rmse, rf.rmse, rf.rmse2, svml.rmse, svmr.rmse))) %>%
-  knitr::kable()
-final.model.table %>%
-  kable_classic(full_width = F, html_font = "Cambria")
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#final.model.table = data.frame(model = rep(c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)")), RMSE = rep(c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))) %>%
+#  knitr::kable(digits = 2, captions = "CV RMSE for Each Model")
+
+final_rmse = data.frame(
+  Model = c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)"),
+  RMSE = c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))
+
+final_rmse
+#final.model.table %>%
+#  kable_classic(full_width = F, html_font = "Cambria")
 ```
 
 
 # 4. Conclusions
 
+According to the Cross-Validation RMSE, Bagging has the lowest RMSE ≈ 18.91, meaning among these models, Bagging is the best candidate to predict the catch rate. Although we picked GAM model before having these new models, it seems like all the new models, except SVM(using linear kernel), have better performance than the GAM model. Random Forest and boosting also have very good performance.
 
 # 5. Limitations
 

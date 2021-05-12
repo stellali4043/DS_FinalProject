@@ -66,7 +66,7 @@ trRows = createDataPartition(pkmn.df$catch_rate,
 
 After plotting scatter plots for continuous predictors and boxplots for categorical predictors, significant trends were not observed in different types, egg groups, body_styles or colors. However, the battle attributes: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', and 'speed' seem to have a negative association with catch rate. The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
 theme1$plot.symbol$pch <- 16
@@ -118,7 +118,7 @@ The dataset for analysis contains 644 samples and 18 predictors:
 * `catch_rate`: the response (on 0 - 255 scale)
 
 
-The dataset is split into 75:25 training to test dataset. We include GAM model, which has a dominant performance among some other methods(e.g. lda, qda, nb, lasso, ridge...), as a competitive model for predicting the catch rate. We also choose Boosting, Random Forest, Bagging, and Support Vector Machine models to train the data with cross validation. RMSE is used to compare and choose the final model. Finally, we use clustering to have a better visualization of pokemons that have similar attributes and to see if significant relationship between combat attributes and catch rate can be found in it.
+The dataset is split into 75:25 training to test dataset. Based on our midterm project, We include GAM model, since it has a dominant performance among some other methods(e.g. lda, qda, nb, lasso, ridge...), as a competitive model for predicting the catch rate. We also choose Boosting, Random Forest, Bagging, and Support Vector Machine models to train the data with cross validation. RMSE is used to compare and choose the final model. Finally, we use clustering to have a better visualization of pokemons that have similar attributes and to see if significant relationship between combat attributes and catch rate can be found in it.
 
 
 ## 3.1 GAM
@@ -156,8 +156,8 @@ gbm.fit <- train(catch_rate ~ .,
                  trControl = ctrl,
                  verbose = FALSE)
 
-gbm.pred = predict(gbm.fit, newdata = pkmn.df[-trRows,])
-gbm.rmse = RMSE(gbm.pred, pkmn.df$catch_rate[-trRows])
+gbm.pred = predict(gbm.fit, newdata = pkmn.df[trRows,])
+gbm.rmse = RMSE(gbm.pred, pkmn.df$catch_rate[trRows])
 gbm.rmse # gbm.rmse = 38.38418
 
 # ggplot(gbm.fit, highlight = TRUE)
@@ -171,8 +171,8 @@ rf.fit = randomForest(catch_rate ~ .,
                       subset = trRows,
                       mtry = 6)
 
-rf.pred = predict(rf.fit, newdata = pkmn.df[-trRows,])
-rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[-trRows])
+rf.pred = predict(rf.fit, newdata = pkmn.df[trRows,])
+rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
 
 
 # Bagging
@@ -188,8 +188,8 @@ rf2.fit <- ranger(catch_rate ~ .,
               pkmn.df[trRows,],
               mtry = 6) 
 
-pred.rf2 <- predict(rf2.fit, data = pkmn.df[-trRows,])$predictions
-rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[-trRows])
+pred.rf2 <- predict(rf2.fit, data = pkmn.df[trRows,])$predictions
+rf.rmse2 = RMSE(pred.rf2, pkmn.df$catch_rate[trRows])
 rf.rmse2
 ```
 
@@ -205,8 +205,8 @@ svml.fit = tune.svm(catch_rate ~ .,
                     kernel = "linear",
                     epsilon = exp(seq(-5, 0, len = 20)))
 
-svml.pred = predict(svml.fit$best.model, newdata = pkmn.df[-trRows,])
-svml.rmse = RMSE(svml.pred, pkmn.df$catch_rate[-trRows])
+svml.pred = predict(svml.fit$best.model, newdata = pkmn.df[trRows,])
+svml.rmse = RMSE(svml.pred, pkmn.df$catch_rate[trRows])
 
 
 # radial kernel
@@ -217,8 +217,8 @@ svmr.fit = tune.svm(catch_rate ~. ,
                     epsilon = exp(seq(-5, 0, len = 20)),
                     gamma = exp(seq(-6, -2, len = 10)))
 
-svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[-trRows,])
-svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[-trRows])
+svmr.pred = predict(svmr.fit$best.model, newdata = pkmn.df[trRows,])
+svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[trRows])
 ```
 
 ## 3.4 Clustering

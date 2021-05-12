@@ -140,7 +140,7 @@ gam.rmse = sqrt(mean((pkmn.df$catch_rate[trRows] - predict(gam_fit, newdata = pk
 
 We decide to use tree-based ensemble methods for regression.
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 # Boosting
 ctrl <- trainControl(method = "cv") 
 
@@ -160,7 +160,8 @@ gbm.pred = predict(gbm.fit, newdata = pkmn.df[trRows,])
 gbm.rmse = RMSE(gbm.pred, pkmn.df$catch_rate[trRows])
 gbm.rmse # gbm.rmse = 38.38418
 
-# ggplot(gbm.fit, highlight = TRUE)
+gbm.plot <- ggplot(gbm.fit, highlight = TRUE)
+ggsave(gbm.plot, file="gbm_plot.pdf", scale=2)
 ```
 
 ```{r}

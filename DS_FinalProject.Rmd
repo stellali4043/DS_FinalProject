@@ -232,6 +232,10 @@ ggsave(gbm.plot, file="gbm_plot.pdf", scale=2)
 In SVM, we want to find a separating hyperplane that maximizes the gap between classes to optimally predict the outcome. Support Vector Machine with both linear and radial kernel is used to train the data. The tuning parameter epsilon(trade-off between correct classification and maximization of the gap) and gamma(how non-linear the fit could be) are tuned given a suitable range of numbers in the function.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+model.reg = svm(catch_rate ~ ., 
+                data = pkmn.df[trRows,])
+# print(model.reg)
+
 # linear kernel
 set.seed(2021)
 svml.fit = tune.svm(catch_rate ~ .,

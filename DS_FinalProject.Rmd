@@ -1,6 +1,6 @@
 ---
 title: "P8106 Final Project"
-author: "Phoebe Mo(km3624), Stella Li(cl4043), Yihan Feng()"
+author: "Phoebe Mo(km3624), Stella Li(cl4043), Yihan Feng(yf2555)"
 date: "5/7/2021"
 output:
   pdf_document:
@@ -68,7 +68,9 @@ trRows = createDataPartition(pkmn.df$catch_rate,
 
 # 2. Exploratory Analysis / Visualization
 
-After plotting scatter plots for continuous predictors and boxplots for categorical predictors, significant trends were not observed in different types, egg groups, body_styles or colors. However, the battle attributes: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', and 'speed' seem to have a negative association with catch rate. The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
+After plotting scatter plots for numerical predictors and boxplots for categorical predictors, significant trends were not observed in different types, egg groups, body_styles or colors. However, the battle attributes: 'hp', 'attack', 'defense', 'sp_atk', 'sp_def', and 'speed' seem to have a negative association with catch rate. While 'total' doesn't have an obvious trend. Therefore, we decided to keep specific battle features for analysis. 
+
+The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 theme1 <- trellis.par.get()
@@ -165,7 +167,7 @@ bagging_2 <- ranger(catch_rate ~ .,
               pkmn.df[trRows,],
               mtry = 18,
               importance = "permutation") 
-barplot(sort(ranger::importance(bagging_2), decreasing = FALSE), las = 2, horiz = TRUE, cex.names = 0.7, col = colorRampPalette(colors = c("red", "pink"))(5))
+#barplot(sort(ranger::importance(bagging_2), decreasing = FALSE), las = 2, horiz = TRUE, cex.names = 0.7, col = colorRampPalette(colors = c("red", "pink"))(5))
 
 pred.bag2 <- predict(bagging_2, data = pkmn.df[trRows,])$predictions
 bag2.rmse = RMSE(pred.bag2, pkmn.df$catch_rate[trRows]) #18.90574
@@ -265,8 +267,8 @@ svmr.rmse = RMSE(svmr.pred, pkmn.df$catch_rate[trRows])
 ## 3.4 Clustering
 
 In order to have a better visualization of the relationship between the pokemon and their different attributes, we use both k-means clustering and hierarchical clustering to group similar pokemons together. Here, we use only numerical variables.
-As can see from k-means clustering, we use the optimal number of clusters = 3 and use Euclidean distance to decide the similarity. From the plot briefly, cluster 1 tends to has lower hp, cluster 2 has lower catch_rate, and cluster 3 has relatively higher weight and defense. \newline
-For the hierarchical clustering, we use complete linkage(maximal inter-cluster dissimilarity) and euclidean distance. Since hierarchical clustering provides us all the possible combinations of clusters, to visualize, we made a heat map to see how all the variables vary for each observation. From the heat map, we found pokemons that have higher hp, height, and weight tend to have lower catch_rate, whereas those which have relatively low combat attributes tend to have higher catch_rate.
+As can see from k-means clustering (Figure 4), we use the optimal number of clusters = 3 and use Euclidean distance to decide the similarity. From the plot briefly, cluster 1 tends to has lower hp, cluster 2 has lower catch_rate, and cluster 3 has relatively higher weight and defense. \newline
+For the hierarchical clustering, we use complete linkage(maximal inter-cluster dissimilarity) and euclidean distance. Since hierarchical clustering provides us all the possible combinations of clusters, to visualize, we made a heat map to see how all the variables vary for each observation. From the heat map (Figure 5), we found pokemons that have higher hp, height, and weight tend to have lower catch_rate, whereas those which have relatively low combat attributes tend to have higher catch_rate.
 
 ```{r eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # reorganize data to be used
@@ -345,13 +347,49 @@ final_rmse = data.frame(
   Model = c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)"),
   RMSE = c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))
 
-final_rmse
+final_rmse1 = final_rmse %>%
+  knitr::kable(digits = 2,
+               caption = "Table 1. Cross Validation RMSE Table")
 ```
 
 
 # 4. Conclusions
 
-According to the Cross-Validation RMSE, Bagging has the lowest RMSE ≈ 18.91, meaning among these models, Bagging is the best candidate to predict the catch rate. Although we picked GAM model before having these new models, it seems like all the new models, except SVM(using linear kernel), have better performance than the GAM model. Random Forest and boosting also have very good performance.
+4.1 
+According to the Cross-Validation RMSE (Table 1), Bagging has the lowest RMSE ≈ 18.91, meaning among these models, Bagging is the best candidate to predict the catch rate. Although we picked GAM model before having these new models, it seems like all the new models, except for SVM (using linear kernel), have better performance than the GAM model. Random Forest and boosting also have very good performance.
+
+4.2 
+The outcomes given by our models and clustering coincide with our expectation and initial visualization that, pokemons which have better combat attributes(e.g. attack, defense...) have a lower catch rate. But we did not expect that the probability of having male pokemons may also affect the catch rate, which is quite surprising.
+
+Also, we expected to see random forest model may be the best candidate to predict catch rate because it helps improve bagging by decorrelating the trees, but in fact, Bagging model performs the best in out project.
+
+4.3 Variable Importance (Figure 6)
+
+1. The top 5 important variables resulted from random forest is: 
+* pr_male
+* sp_def
+* sp_atk
+* speed
+* body_style
+
+2. The top 5 important variables resulted from bagging is: 
+* pr_male
+* sp_atk
+* sp_def
+* speed
+* body_style
+
+3. The top 5 important variables resulted from boosting is: 
+* height_m
+* hp
+* attack
+* sp_def
+* pr_male
+
+Based on the 3 models, important variables are speed of defense (sp_def), probability of male Pokemon (pr_male), speed, speed of attack (sp_atk), and body style. 
+
+4.4 Clustering
+We found Pokemons that have higher hp, height, and weight tend to have lower catch_rate, whereas those which have relatively low combat attributes tend to have higher catch_rate.
 
 # 5. Limitations
 
@@ -359,4 +397,35 @@ According to the Cross-Validation RMSE, Bagging has the lowest RMSE ≈ 18.91, m
 
 5.2 For the k-means clustering, since we need to decide k ourselves, there is no reference for us to decide which k is better. So the manually selected k and the given visualization may not be the best presentation.
 
+5.3 There are no specific assumptions for the Random Forest model. 
 
+
+# Appendix 
+
+![](anno_fig/fig1.png)
+
+\newpage
+
+```{r}
+total.plot
+```
+
+\newpage
+
+
+![](anno_fig/fig3.png)
+\newpage
+
+![](anno_fig/fig4.png)
+\newpage
+
+![](anno_fig/fig5.png)
+\newpage
+
+![](anno_fig/fig6.png)
+\newpage
+
+
+```{r}
+final_rmse1
+```

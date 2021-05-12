@@ -72,7 +72,7 @@ After plotting scatter plots for numerical predictors and boxplots for categoric
 
 The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
 theme1$plot.symbol$pch <- 16
@@ -80,7 +80,7 @@ theme1$plot.line$col <- rgb(.8, .1, .1, 1)
 theme1$plot.line$lwd <- 2 
 theme1$strip.background$col <- rgb(.0, .2, .6, .2) 
 trellis.par.set(theme1)
-featurePlot(x = pkmn.df[, 3:8], y = pkmn.df$catch_rate,
+#featurePlot(x = pkmn.df[, 3:8], y = pkmn.df$catch_rate,
             plot = "scatter",
             span = .5,
             labels = c("Battel Feature Predictors","Catch Rate"), type = c("p", "smooth"), layout = c(2,3))
@@ -91,12 +91,11 @@ pkmn.df.vis = read_csv("./pokemon.csv") %>% janitor::clean_names()
 total.plot = ggplot(pkmn.df.vis, aes(x = total, y = catch_rate)) + 
   geom_point() +
   labs(title = "Figure 2. Scatterplot of total battle features vs. catch rate")
-total.plot
 
 # checking correlation between continuous predictors
 # height_m and weight_kg have high correlation = 0.63. So going to drop one of them, here I choose to drop height_m.
-cor(pkmn.df %>% dplyr::select(-c(type_1, type_2, generation, is_legendary, color, egg_group_1, egg_group_2, body_style, has_mega_evolution))) %>%
-  corrplot(method = "circle", type = "upper", diag = F)
+#cor(pkmn.df %>% dplyr::select(-c(type_1, type_2, generation, is_legendary, color, egg_group_1, egg_group_2, body_style, has_mega_evolution))) %>%
+#  corrplot(method = "circle", type = "upper", diag = F)
 ```
 
 # 3. Models
@@ -324,25 +323,25 @@ group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 #variance_importance <- ggplot(gbm.fit, highlight = TRUE)
 #ggsave(variance_importance, file="Variance Importance.pdf", scale=2)
 
-rf_vi = barplot(sort(ranger::importance(rf2.fit), decreasing = FALSE),las = 2, horiz = TRUE, cex.names = 0.7,col = colorRampPalette(colors = c("lightgrey","lightpink"))(8))
+#rf_vi = barplot(sort(ranger::importance(rf2.fit), decreasing = FALSE),las = 2, horiz = TRUE, cex.names = 0.7,col = colorRampPalette(colors = c("lightgrey","lightpink"))(8))
 
-bag_vi = barplot(sort(ranger::importance(bagging_2), decreasing = FALSE),las = 2, horiz = TRUE, cex.names = 0.7,col = colorRampPalette(colors = c("lightgrey", "lightpink"))(8))
+#bag_vi = barplot(sort(ranger::importance(bagging_2), decreasing = FALSE),las = 2, horiz = TRUE, cex.names = 0.7,col = colorRampPalette(colors = c("lightgrey", "lightpink"))(8))
 
-boost_vi = summary(gbm.fit$finalModel, las = 2, cBars = 10, cex.names = 0.6)
+#boost_vi = summary(gbm.fit$finalModel, las = 2, cBars = 10, cex.names = 0.6)
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, eval=FALSE}
 ## attaching variable importance images
-knitr::include_graphics("./plot/rf_vi.png")
-knitr::include_graphics("./plot/bag_vi.png")
-knitr::include_graphics("./plot/boost_vi.png")
-knitr::include_graphics("./plot/k-mean-cluster-plot.png")
-knitr::include_graphics("./plot/hc-heatmap.png")
+#knitr::include_graphics("./plot/rf_vi.png")
+#knitr::include_graphics("./plot/bag_vi.png")
+#knitr::include_graphics("./plot/boost_vi.png")
+#knitr::include_graphics("./plot/k-mean-cluster-plot.png")
+#knitr::include_graphics("./plot/hc-heatmap.png")
 ```
 
-## 3.6 Final Model and Visualization
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
 final_rmse = data.frame(
   Model = c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)"),
   RMSE = c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))
@@ -406,7 +405,7 @@ We found Pokemons that have higher hp, height, and weight tend to have lower cat
 
 \newpage
 
-```{r}
+```{r echo=FALSE}
 total.plot
 ```
 
@@ -426,6 +425,6 @@ total.plot
 \newpage
 
 
-```{r}
+```{r echo=FALSE}
 final_rmse1
 ```

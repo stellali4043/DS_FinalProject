@@ -72,7 +72,7 @@ After plotting scatter plots for numerical predictors and boxplots for categoric
 
 The 'weight_kg' also seems to have negative association with catch rate. And the pokemons that are legendary have significantly lower catch rates. Below are some selected visualizations:
 
-```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5) 
 theme1$plot.symbol$pch <- 16
@@ -81,9 +81,9 @@ theme1$plot.line$lwd <- 2
 theme1$strip.background$col <- rgb(.0, .2, .6, .2) 
 trellis.par.set(theme1)
 #featurePlot(x = pkmn.df[, 3:8], y = pkmn.df$catch_rate,
-            plot = "scatter",
-            span = .5,
-            labels = c("Battel Feature Predictors","Catch Rate"), type = c("p", "smooth"), layout = c(2,3))
+#            plot = "scatter",
+#            span = .5,
+#            labels = c("Battel Feature Predictors","Catch Rate"), type = #c("p", "smooth"), layout = c(2,3))
 
 
 # reread the data, since we need to use the 'total' variable here for visualization
@@ -310,8 +310,6 @@ hc_dendrogram = fviz_dend(hc_complete, k = 8, cex = 0.3, palette = "jco",
 group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 ```
 
-## 3.5 Variable Importance and Clustering Results
-
 ```{r eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 
 #set.seed(2021)
@@ -341,7 +339,7 @@ group_8 = poke_cluster[cutree(hc_complete, 8) == 8, ]
 
 
 
-```{r echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 final_rmse = data.frame(
   Model = c("GAM", "Boosting", "Random Forest", "Bagging", "SVM (linear)", "SVM (radial)"),
   RMSE = c(42.10908, 19.87961, 19.75706, 18.90574, 44.78799, 35.27461))
@@ -398,6 +396,7 @@ We found Pokemons that have higher hp, height, and weight tend to have lower cat
 
 5.3 There are no specific assumptions for the Random Forest model. 
 
+\newpage
 
 # Appendix 
 

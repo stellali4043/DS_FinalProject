@@ -143,17 +143,6 @@ gam.rmse = sqrt(mean((pkmn.df$catch_rate[trRows] - predict(gam_fit, newdata = pk
 We decide to use tree-based ensemble methods for regression.
 
 ```{r message=FALSE, warning=FALSE}
-# Random Forest
-set.seed(2021)
-rf.fit = randomForest(catch_rate ~ .,
-                      pkmn.df,
-                      subset = trRows,
-                      mtry = 6)
-
-rf.pred = predict(rf.fit, newdata = pkmn.df[trRows,])
-rf.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
-rf.rmse
-
 # Bagging
 set.seed(2021)
 bagging <- randomForest(catch_rate ~ .,
@@ -165,7 +154,7 @@ bagging.pred = predict(bagging, newdata = pkmn.df[trRows,])
 bagging.rmse = RMSE(rf.pred, pkmn.df$catch_rate[trRows])
 bagging.rmse
 
-# fast implementation
+# Random Forest - fast implementation
 set.seed(2021)
 rf2.fit <- ranger(catch_rate ~ .,
               pkmn.df[trRows,],
